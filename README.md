@@ -2,6 +2,7 @@ rust-nntp
 ================
 NNTP Client for Rust
 
+
 [![Build Status](https://travis-ci.org/mattnenterprise/rust-nntp.svg)](https://travis-ci.org/mattnenterprise/rust-nntp)
 
 ### Installation
