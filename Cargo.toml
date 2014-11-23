@@ -1,0 +1,17 @@
+[package]
+
+name = "rust-nntp"
+version = "0.0.1"
+authors = ["Matt McCoy <mattnenterprise@yahoo.com>"]
+repository = "https://github.com/mattnenterprise/rust-nntp"
+description = "NNTP client for Rust"
+readme = "README.md"
+license = "MIT"
+
+[lib]
+name = "nntp"
+path = "src/nntp.rs"
+
+[[bin]]
+name = "example"
+path = "example.rs"
