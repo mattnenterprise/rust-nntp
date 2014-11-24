@@ -9,7 +9,7 @@ NNTP Client for Rust
 
 Add nntp via your `Cargo.toml`:
 ```toml
-[dependencies.pop3]
+[dependencies.nntp]
 git = "https://github.com/mattnenterprise/rust-nntp"
 ```
 

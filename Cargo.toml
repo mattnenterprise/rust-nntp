@@ -1,6 +1,6 @@
 [package]
 
-name = "rust-nntp"
+name = "nntp"
 version = "0.0.1"
 authors = ["Matt McCoy <mattnenterprise@yahoo.com>"]
 repository = "https://github.com/mattnenterprise/rust-nntp"
