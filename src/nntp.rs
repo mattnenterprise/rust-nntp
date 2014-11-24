@@ -6,6 +6,7 @@ use std::io::{IoResult, TcpStream, IoError};
 use std::io::IoErrorKind::OtherIoError;
 use std::vec::Vec;
 
+/// Stream to be used for interfacing a NNTP server.
 pub struct NNTPStream {
 	stream: TcpStream,
 	pub host: &'static str,
@@ -14,6 +15,7 @@ pub struct NNTPStream {
 
 impl NNTPStream {
 	
+	/// Creates an NNTP Stream.
 	pub fn connect(host: &'static str, port: u16) -> IoResult<NNTPStream> {
 		let connect_string = format!("{}:{}", host, port);
 		let tcp_stream = try!(TcpStream::connect(connect_string.as_slice()));
@@ -27,14 +29,17 @@ impl NNTPStream {
 		Ok(socket)
 	}
 
+	/// The article indicated by the current article number in the currently selected newsgroup is selected.
 	pub fn article(&mut self) -> Result<Vec<String>, String> {
 		self.retrieve_article(format!("ARTICLE\r\n").as_slice())
 	}
 
+	/// The article indicated by the article id is selected.
 	pub fn article_by_id(&mut self, article_id: &str) -> Result<Vec<String>, String> {
 		self.retrieve_article(format!("ARTICLE {}\r\n", article_id).as_slice())
 	}
 
+	/// The article indicated by the article number in the currently selected newsgroup is selected. 
 	pub fn article_by_number(&mut self, article_number: int) -> Result<Vec<String>, String> {
 		self.retrieve_article(format!("ARTICLE {}\r\n", article_number).as_slice())
 	}
@@ -50,14 +55,17 @@ impl NNTPStream {
 		self.read_multiline_response()
 	}
 
+	/// Retrieves the body of the current article number in the currently selected newsgroup.
 	pub fn body(&mut self) -> Result<Vec<String>, String> {
 		self.retrieve_body(format!("BODY\r\n").as_slice())
 	}
 
+	/// Retrieves the body of the article id.
 	pub fn body_by_id(&mut self, article_id: &str) -> Result<Vec<String>, String> {
 		self.retrieve_body(format!("BODY {}\r\n", article_id).as_slice())
 	}
 
+	/// Retrieves the body of the article number in the currently selected newsgroup.
 	pub fn body_by_number(&mut self, article_number: int) -> Result<Vec<String>, String> {
 		self.retrieve_body(format!("BODY {}\r\n", article_number).as_slice())
 	}
@@ -73,6 +81,7 @@ impl NNTPStream {
 		self.read_multiline_response()
 	}
 
+	/// Gives the list of capabilities that the server has.
 	pub fn capabilities(&mut self) -> Result<Vec<String>, String> {
 		let capabilities_command = format!("CAPABILITIES\r\n");
 
@@ -86,6 +95,7 @@ impl NNTPStream {
 		self.read_multiline_response()
 	}
 
+	/// Retrieves the date as the server sees the date.
 	pub fn date(&mut self) -> Result<String, String> {
 		let date_command = format!("DATE\r\n");
 
@@ -97,14 +107,17 @@ impl NNTPStream {
 		}
 	}
 
+	/// /// Retrieves the head of the current article number in the currently selected newsgroup.
 	pub fn head(&mut self) -> Result<Vec<String>, String> {
 		self.retrieve_head(format!("HEAD\r\n").as_slice())
 	}
 
+	/// Retrieves the head of the article id.
 	pub fn head_by_id(&mut self, article_id: &str) -> Result<Vec<String>, String> {
 		self.retrieve_head(format!("HEAD {}\r\n", article_id).as_slice())
 	}
 
+	/// Retrieves the head of the article number in the currently selected newsgroup.
 	pub fn head_by_number(&mut self, article_number: int) -> Result<Vec<String>, String> {
 		self.retrieve_head(format!("HEAD {}\r\n", article_number).as_slice())
 	}
@@ -120,6 +133,7 @@ impl NNTPStream {
 		self.read_multiline_response()
 	}
 
+	/// Moves the currently selected article number back one
 	pub fn last(&mut self) -> Result<String, String> {
 		let last_command = format!("LAST\r\n");
 
@@ -131,6 +145,7 @@ impl NNTPStream {
 		}
 	}
 
+	/// Lists all of the newgroups on the server.
 	pub fn list(&mut self) -> Result<Vec<String>, String> {
 		let list_command = format!("LIST\r\n");
 
@@ -144,6 +159,7 @@ impl NNTPStream {
 		self.read_multiline_response()
 	}
 
+	/// Selects a newsgroup
 	pub fn group(&mut self, group: &str) -> Result<(), String> {
 		let group_command = format!("GROUP {}\r\n", group);
 
@@ -155,6 +171,7 @@ impl NNTPStream {
 		}
 	}
 
+	/// Show the help command given on the server.
 	pub fn help(&mut self) -> Result<Vec<String>, String> {
 		let help_command = format!("HELP\r\n");
 
@@ -168,6 +185,7 @@ impl NNTPStream {
 		self.read_multiline_response()
 	}
 
+	/// Quits the current session.
 	pub fn quit(&mut self) -> Result<(), String> {
 		let quit_command = format!("QUIT\r\n");
 		self.stream.write_str(quit_command.as_slice());
@@ -178,6 +196,7 @@ impl NNTPStream {
 		}
 	}
 
+	/// Retrieves a list of newsgroups since the date and time given.
 	pub fn newgroups(&mut self, date: &str, time: &str, use_gmt: bool) -> Result<Vec<String>, String> {
 		let newgroups_command = match use_gmt {
 			true => format!("NEWSGROUP {} {} GMT\r\n", date, time),
@@ -194,6 +213,7 @@ impl NNTPStream {
 		self.read_multiline_response()
 	}
 
+	/// Retrieves a list of new news since the date and time given.
 	pub fn newnews(&mut self, wildmat: &str, date: &str, time: &str, use_gmt: bool) -> Result<Vec<String>, String> {
 		let newnews_command = match use_gmt {
 			true => format!("NEWNEWS {} {} {} GMT\r\n", wildmat, date, time),
@@ -210,6 +230,7 @@ impl NNTPStream {
 		self.read_multiline_response()
 	}
 
+	/// Moves the currently selected article number forward one
 	pub fn next(&mut self) -> Result<String, String> {
 		let next_command = format!("NEXT\r\n");
 		self.stream.write_str(next_command.as_slice());
@@ -220,6 +241,7 @@ impl NNTPStream {
 		}
 	}
 
+	/// Posts a message to the NNTP server.
 	pub fn post(&mut self, message: &str) -> Result<(), String> {
 		if !self.is_valid_message(message) {
 			return Err(format!("Invalid message format. Message must end with \"\r\n.\r\n\""));
@@ -242,14 +264,17 @@ impl NNTPStream {
 		}
 	}
 
+	/// Gets information about the current article.
 	pub fn stat(&mut self) -> Result<String, String> {
 		self.retrieve_stat(format!("STAT\r\n").as_slice())
 	}
 
+	/// Gets the information about the article id.
 	pub fn stat_by_id(&mut self, article_id: &str) -> Result<String, String> {
 		self.retrieve_stat(format!("STAT {}\r\n", article_id).as_slice())
 	}
 
+	/// Gets the information about the article number.
 	pub fn stat_by_number(&mut self, article_number: int) -> Result<String, String> {
 		self.retrieve_stat(format!("STAT {}\r\n", article_number).as_slice())
 	}
