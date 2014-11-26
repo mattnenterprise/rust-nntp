@@ -5,12 +5,60 @@ use std::string::String;
 use std::io::{IoResult, TcpStream, IoError};
 use std::io::IoErrorKind::OtherIoError;
 use std::vec::Vec;
+use std::collections::HashMap;
 
-/// Stream to be used for interfacing a NNTP server.
+/// Stream to be used for interfacing with a NNTP server.
 pub struct NNTPStream {
 	stream: TcpStream,
 	pub host: &'static str,
 	pub port: u16
+}
+
+pub struct Article {
+	pub headers: HashMap<String, String>,
+	pub body: Vec<String>
+}
+
+impl Article {
+	pub fn new_article(lines: Vec<String>) -> Article {
+		let mut headers = HashMap::new();
+		let mut body = Vec::new();
+		let mut parsing_headers = true;
+
+		for i in lines.iter() {
+			if i == &format!("\r\n") {
+				parsing_headers = false;
+				continue;
+			}
+			if parsing_headers {
+				let mut header = i.as_slice().splitn(2, ':');
+				let chars_to_trim: &[char] = &['\r', '\n'];
+				let key = format!("{}", header.nth(0).unwrap().trim_chars(chars_to_trim));
+				let value = format!("{}", header.nth(0).unwrap().trim_chars(chars_to_trim));
+				headers.insert(key, value);
+			} else {
+				body.push(i.clone());
+			}
+
+		}
+		Article {headers: headers, body: body}
+	}
+}
+
+pub struct NewsGroup {
+	pub name: String ,
+	pub high: int,
+	pub low: int,
+	pub status: String
+}
+
+impl NewsGroup {
+	pub fn new_news_group(group: &str) -> NewsGroup {
+		let chars_to_trim: &[char] = &['\r', '\n', ' '];
+		let trimmed_group = group.trim_chars(chars_to_trim);
+		let split_group: Vec<&str> = trimmed_group.split(' ').collect();
+		NewsGroup{name: format!("{}", split_group[0]), high: from_str(split_group[1]).unwrap(), low: from_str(split_group[2]).unwrap(), status: format!("{}", split_group[3])}
+	}	
 }
 
 impl NNTPStream {
@@ -30,29 +78,37 @@ impl NNTPStream {
 	}
 
 	/// The article indicated by the current article number in the currently selected newsgroup is selected.
-	pub fn article(&mut self) -> Result<Vec<String>, String> {
+	pub fn article(&mut self) -> Result<Article, String> {
 		self.retrieve_article(format!("ARTICLE\r\n").as_slice())
 	}
 
 	/// The article indicated by the article id is selected.
-	pub fn article_by_id(&mut self, article_id: &str) -> Result<Vec<String>, String> {
+	pub fn article_by_id(&mut self, article_id: &str) -> Result<Article, String> {
 		self.retrieve_article(format!("ARTICLE {}\r\n", article_id).as_slice())
 	}
 
-	/// The article indicated by the article number in the currently selected newsgroup is selected. 
-	pub fn article_by_number(&mut self, article_number: int) -> Result<Vec<String>, String> {
+	/// The article indicated by the article number in the currently selected newsgroup is selected.
+	pub fn article_by_number(&mut self, article_number: int) -> Result<Article, String> {
 		self.retrieve_article(format!("ARTICLE {}\r\n", article_number).as_slice())
 	}
 
-	fn retrieve_article(&mut self, article_command: &str) -> Result<Vec<String>, String> {
-		self.stream.write_str(article_command.as_slice());
+	fn retrieve_article(&mut self, article_command: &str) -> Result<Article, String> {
+		match self.stream.write_str(article_command.as_slice()) {
+			Ok(_) => (),
+			Err(_) => return Err(format!("Write Error"))
+		}
 
 		match self.read_response(220) {
 			Ok(_) => (),
 			Err(e) => return Err(e)
 		}
 
-		self.read_multiline_response()
+		match self.read_multiline_response() {
+			Ok(lines) => {
+				Ok(Article::new_article(lines))
+			}
+			Err(e) => Err(e)
+		}
 	}
 
 	/// Retrieves the body of the current article number in the currently selected newsgroup.
@@ -71,7 +127,10 @@ impl NNTPStream {
 	}
 
 	fn retrieve_body(&mut self, body_command: &str) -> Result<Vec<String>, String> {
-		self.stream.write_str(body_command.as_slice());
+		match self.stream.write_str(body_command.as_slice()) {
+			Ok(_) => (),
+			Err(_) => return Err(format!("Write Error"))
+		}
 
 		match self.read_response(222) {
 			Ok(_) => (),
@@ -85,7 +144,10 @@ impl NNTPStream {
 	pub fn capabilities(&mut self) -> Result<Vec<String>, String> {
 		let capabilities_command = format!("CAPABILITIES\r\n");
 
-		self.stream.write_str(capabilities_command.as_slice());
+		match self.stream.write_str(capabilities_command.as_slice()) {
+			Ok(_) => (),
+			Err(_) => return Err(format!("Write Error"))
+		}
 
 		match self.read_response(101) {
 			Ok(_) => (),
@@ -99,7 +161,10 @@ impl NNTPStream {
 	pub fn date(&mut self) -> Result<String, String> {
 		let date_command = format!("DATE\r\n");
 
-		self.stream.write_str(date_command.as_slice());
+		match self.stream.write_str(date_command.as_slice()) {
+			Ok(_) => (),
+			Err(_) => return Err(format!("Write Error"))
+		}
 
 		match self.read_response(111) {
 			Ok((_, message)) => Ok(message),
@@ -107,23 +172,26 @@ impl NNTPStream {
 		}
 	}
 
-	/// /// Retrieves the head of the current article number in the currently selected newsgroup.
+	/// Retrieves the headers of the current article number in the currently selected newsgroup.
 	pub fn head(&mut self) -> Result<Vec<String>, String> {
 		self.retrieve_head(format!("HEAD\r\n").as_slice())
 	}
 
-	/// Retrieves the head of the article id.
+	/// Retrieves the headers of the article id.
 	pub fn head_by_id(&mut self, article_id: &str) -> Result<Vec<String>, String> {
 		self.retrieve_head(format!("HEAD {}\r\n", article_id).as_slice())
 	}
 
-	/// Retrieves the head of the article number in the currently selected newsgroup.
+	/// Retrieves the headers of the article number in the currently selected newsgroup.
 	pub fn head_by_number(&mut self, article_number: int) -> Result<Vec<String>, String> {
 		self.retrieve_head(format!("HEAD {}\r\n", article_number).as_slice())
 	}
 
 	fn retrieve_head(&mut self, head_command: &str) -> Result<Vec<String>, String> {
-		self.stream.write_str(head_command.as_slice());
+		match self.stream.write_str(head_command.as_slice()) {
+			Ok(_) => (),
+			Err(_) => return Err(format!("Write Error"))
+		}
 
 		match self.read_response(221) {
 			Ok(_) => (),
@@ -137,7 +205,10 @@ impl NNTPStream {
 	pub fn last(&mut self) -> Result<String, String> {
 		let last_command = format!("LAST\r\n");
 
-		self.stream.write_str(last_command.as_slice());
+		match self.stream.write_str(last_command.as_slice()) {
+			Ok(_) => (),
+			Err(_) => return Err(format!("Write Error"))
+		}
 
 		match self.read_response(223) {
 			Ok((_, message)) => Ok(message),
@@ -146,24 +217,36 @@ impl NNTPStream {
 	}
 
 	/// Lists all of the newgroups on the server.
-	pub fn list(&mut self) -> Result<Vec<String>, String> {
+	pub fn list(&mut self) -> Result<Vec<NewsGroup>, String> {
 		let list_command = format!("LIST\r\n");
 
-		self.stream.write_str(list_command.as_slice());
+		match self.stream.write_str(list_command.as_slice()) {
+			Ok(_) => (),
+			Err(_) => return Err(format!("Write Error"))
+		}
 
 		match self.read_response(215) {
 			Ok(_) => (),
 			Err(e) => return Err(format!("{}", e))
 		}
 
-		self.read_multiline_response()
+		match self.read_multiline_response() {
+			Ok(lines) => {
+				let lines: Vec<NewsGroup> = lines.iter().map(|ref mut x| NewsGroup::new_news_group((*x).as_slice())).collect();
+				return Ok(lines)
+			},
+			Err(e) => Err(e)
+		}
 	}
 
 	/// Selects a newsgroup
 	pub fn group(&mut self, group: &str) -> Result<(), String> {
 		let group_command = format!("GROUP {}\r\n", group);
 
-		self.stream.write_str(group_command.as_slice());
+		match self.stream.write_str(group_command.as_slice()) {
+			Ok(_) => (),
+			Err(_) => return Err(format!("Write Error"))
+		}
 
 		match self.read_response(211) {
 			Ok(_) => Ok(()),
@@ -175,7 +258,10 @@ impl NNTPStream {
 	pub fn help(&mut self) -> Result<Vec<String>, String> {
 		let help_command = format!("HELP\r\n");
 
-		self.stream.write_str(help_command.as_slice());
+		match self.stream.write_str(help_command.as_slice()) {
+			Ok(_) => (),
+			Err(_) => return Err(format!("Write Error"))
+		}
 
 		match self.read_response(100) {
 			Ok(_) => (),
@@ -188,7 +274,10 @@ impl NNTPStream {
 	/// Quits the current session.
 	pub fn quit(&mut self) -> Result<(), String> {
 		let quit_command = format!("QUIT\r\n");
-		self.stream.write_str(quit_command.as_slice());
+		match self.stream.write_str(quit_command.as_slice()) {
+			Ok(_) => (),
+			Err(_) => return Err(format!("Write Error"))
+		}
 
 		match self.read_response(205) {
 			Ok(_) => Ok(()),
@@ -203,7 +292,10 @@ impl NNTPStream {
 			false => format!("NEWSGROUP {} {}\r\n", date, time)
 		};
 
-		self.stream.write_str(newgroups_command.as_slice());
+		match self.stream.write_str(newgroups_command.as_slice()) {
+			Ok(_) => (),
+			Err(_) => return Err(format!("Write Error"))
+		}
 
 		match self.read_response(231) {
 			Ok(_) => (),
@@ -220,7 +312,10 @@ impl NNTPStream {
 			false => format!("NEWNEWS {} {} {}\r\n", wildmat, date, time)
 		};
 
-		self.stream.write_str(newnews_command.as_slice());
+		match self.stream.write_str(newnews_command.as_slice()) {
+			Ok(_) => (),
+			Err(_) => return Err(format!("Write Error"))
+		}
 
 		match self.read_response(230) {
 			Ok(_) => (),
@@ -233,7 +328,10 @@ impl NNTPStream {
 	/// Moves the currently selected article number forward one
 	pub fn next(&mut self) -> Result<String, String> {
 		let next_command = format!("NEXT\r\n");
-		self.stream.write_str(next_command.as_slice());
+		match self.stream.write_str(next_command.as_slice()) {
+			Ok(_) => (),
+			Err(_) => return Err(format!("Write Error"))
+		}
 
 		match self.read_response(223) {
 			Ok((_, message)) => Ok(message),
@@ -249,14 +347,20 @@ impl NNTPStream {
 
 		let post_command = format!("POST\r\n");
 
-		self.stream.write_str(post_command.as_slice());
+		match self.stream.write_str(post_command.as_slice()) {
+			Ok(_) => (),
+			Err(_) => return Err(format!("Write Error"))
+		}
 
 		match self.read_response(340) {
 			Ok(_) => (),
 			Err(e) => return Err(e)
 		};
 
-		self.stream.write_str(message);
+		match self.stream.write_str(message) {
+			Ok(_) => (),
+			Err(_) => return Err(format!("Write Error"))
+		}
 
 		match self.read_response(240) {
 			Ok(_) => Ok(()),
@@ -280,7 +384,10 @@ impl NNTPStream {
 	}
 
 	fn retrieve_stat(&mut self, stat_command: &str) -> Result<String, String> {
-		self.stream.write_str(stat_command.as_slice());
+		match self.stream.write_str(stat_command.as_slice()) {
+			Ok(_) => (),
+			Err(_) => return Err(format!("Write Error"))
+		}
 
 		match self.read_response(223) {
 			Ok((_, message)) => Ok(message),

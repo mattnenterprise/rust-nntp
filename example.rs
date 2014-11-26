@@ -1,6 +1,6 @@
 extern crate nntp;
 
-use nntp::{NNTPStream};
+use nntp::{Article, NNTPStream};
 
 fn main() {
 	let mut nntp_stream = match NNTPStream::connect("nntp.aioe.org", 119) {
@@ -18,10 +18,10 @@ fn main() {
 	}
 
 	match nntp_stream.list() {
-		Ok(lines) => {
-			for line in lines.iter() {
-				print!("{}", line);
-			}
+		Ok(groups) => {
+			for group in groups.iter() {
+				println!("Name: {}, High: {}, Low: {}, Status: {}", group.name, group.high, group.low, group.status)
+			} 
 		},
 		Err(e) => panic!(e)
 	};
@@ -32,18 +32,24 @@ fn main() {
 	}
 
 	match nntp_stream.article_by_number(6000) {
-		Ok(lines) => {
-			for line in lines.iter() {
-				print!("{}", line);
+		Ok(Article{headers, body}) => {
+			for (key, value) in headers.iter() {
+				println!("{}: {}", key, value)
+			}
+			for line in body.iter() {
+				print!("{}", line)
 			}
 		},
 		Err(e) => panic!(e)
 	}
 
 	match nntp_stream.article_by_id("<E2w*P06cv@news.chiark.greenend.org.uk>") {
-		Ok(lines) => {
-			for line in lines.iter() {
-				print!("{}", line);
+		Ok(Article{headers, body}) => {
+			for (key, value) in headers.iter() {
+				println!("{}: {}", key, value)
+			}
+			for line in body.iter() {
+				print!("{}", line)
 			}
 		},
 		Err(e) => panic!(e)
