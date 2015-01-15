@@ -48,7 +48,7 @@ fn main() {
 		Err(e) => panic!(e)
 	}
 
-	match nntp_stream.article_by_number(6000) {
+	match nntp_stream.article_by_number(6187) {
 		Ok(Article{headers, body}) => {
 			for (key, value) in headers.iter() {
 				println!("{}: {}", key, value)
@@ -60,7 +60,7 @@ fn main() {
 		Err(e) => panic!(e)
 	}
 
-	match nntp_stream.article_by_id("<E2w*P06cv@news.chiark.greenend.org.uk>") {
+	match nntp_stream.article_by_id("<cakj55F1dofU5@mid.individual.net>") {
 		Ok(Article{headers, body}) => {
 			for (key, value) in headers.iter() {
 				println!("{}: {}", key, value)
