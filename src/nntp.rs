@@ -6,6 +6,7 @@ use std::io::{IoResult, TcpStream, IoError};
 use std::io::IoErrorKind::OtherIoError;
 use std::vec::Vec;
 use std::collections::HashMap;
+use std::str::FromStr;
 
 /// Stream to be used for interfacing with a NNTP server.
 pub struct NNTPStream {
@@ -33,8 +34,8 @@ impl Article {
 			if parsing_headers {
 				let mut header = i.as_slice().splitn(2, ':');
 				let chars_to_trim: &[char] = &['\r', '\n'];
-				let key = format!("{}", header.nth(0).unwrap().trim_chars(chars_to_trim));
-				let value = format!("{}", header.nth(0).unwrap().trim_chars(chars_to_trim));
+				let key = format!("{}", header.nth(0).unwrap().trim_matches(chars_to_trim));
+				let value = format!("{}", header.nth(0).unwrap().trim_matches(chars_to_trim));
 				headers.insert(key, value);
 			} else {
 				body.push(i.clone());
@@ -55,9 +56,9 @@ pub struct NewsGroup {
 impl NewsGroup {
 	pub fn new_news_group(group: &str) -> NewsGroup {
 		let chars_to_trim: &[char] = &['\r', '\n', ' '];
-		let trimmed_group = group.trim_chars(chars_to_trim);
+		let trimmed_group = group.trim_matches(chars_to_trim);
 		let split_group: Vec<&str> = trimmed_group.split(' ').collect();
-		NewsGroup{name: format!("{}", split_group[0]), high: from_str(split_group[1]).unwrap(), low: from_str(split_group[2]).unwrap(), status: format!("{}", split_group[3])}
+		NewsGroup{name: format!("{}", split_group[0]), high: FromStr::from_str(split_group[1]).unwrap(), low: FromStr::from_str(split_group[2]).unwrap(), status: format!("{}", split_group[3])}
 	}	
 }
 
@@ -429,14 +430,14 @@ impl NNTPStream {
 
 		let response = String::from_utf8(line_buffer).unwrap();
 		let chars_to_trim: &[char] = &['\r', '\n'];
-		let trimmed_response = response.as_slice().trim_chars(chars_to_trim);
+		let trimmed_response = response.as_slice().trim_matches(chars_to_trim);
     	let trimmed_response_vec: Vec<char> = trimmed_response.chars().collect();
     	if trimmed_response_vec.len() < 5 || trimmed_response_vec[3] != ' ' {
     		return Err(format!("Invalid response"));
     	}
 
     	let v: Vec<&str> = trimmed_response.splitn(1, ' ').collect();
-    	let code: int = from_str(v[0]).unwrap();
+    	let code: int = FromStr::from_str(v[0]).unwrap();
     	let message = v[1];
     	if code != expected_code {
     		return Err(format!("Invalid response: {} {}", code, message))
