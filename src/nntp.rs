@@ -1,7 +1,7 @@
 #![crate_name = "nntp"]
 #![crate_type = "lib"]
 
-#![feature(core, io)]
+#![feature(core, collections)]
 
 use std::string::String;
 use std::io::{Read, Result, Error, ErrorKind, Write};
@@ -50,8 +50,8 @@ impl Article {
 
 pub struct NewsGroup {
 	pub name: String ,
-	pub high: int,
-	pub low: int,
+	pub high: isize,
+	pub low: isize,
 	pub status: String
 }
 
@@ -61,11 +61,11 @@ impl NewsGroup {
 		let trimmed_group = group.trim_matches(chars_to_trim);
 		let split_group: Vec<&str> = trimmed_group.split(' ').collect();
 		NewsGroup{name: format!("{}", split_group[0]), high: FromStr::from_str(split_group[1]).unwrap(), low: FromStr::from_str(split_group[2]).unwrap(), status: format!("{}", split_group[3])}
-	}	
+	}
 }
 
 impl NNTPStream {
-	
+
 	/// Creates an NNTP Stream.
 	pub fn connect(host: &'static str, port: u16) -> Result<NNTPStream> {
 		let connect_string = format!("{}:{}", host, port);
@@ -74,7 +74,7 @@ impl NNTPStream {
 
 		match socket.read_response(200) {
 			Ok(_) => (),
-			Err(_) => return Err(Error::new(ErrorKind::Other, "Failed to read greeting response", None))
+			Err(_) => return Err(Error::new(ErrorKind::Other, "Failed to read greeting response"))
 		}
 
 		Ok(socket)
@@ -91,14 +91,14 @@ impl NNTPStream {
 	}
 
 	/// The article indicated by the article number in the currently selected newsgroup is selected.
-	pub fn article_by_number(&mut self, article_number: int) -> Result<Article> {
+	pub fn article_by_number(&mut self, article_number: isize) -> Result<Article> {
 		self.retrieve_article(format!("ARTICLE {}\r\n", article_number).as_slice())
 	}
 
 	fn retrieve_article(&mut self, article_command: &str) -> Result<Article> {
 		match self.stream.write_fmt(format_args!("{}", article_command.as_slice())) {
 			Ok(_) => (),
-			Err(_) => return Err(Error::new(ErrorKind::Other, "Failed to retreive atricle", None))
+			Err(_) => return Err(Error::new(ErrorKind::Other, "Failed to retreive atricle"))
 		}
 
 		match self.read_response(220) {
@@ -125,7 +125,7 @@ impl NNTPStream {
 	}
 
 	/// Retrieves the body of the article number in the currently selected newsgroup.
-	pub fn body_by_number(&mut self, article_number: int) -> Result<Vec<String>> {
+	pub fn body_by_number(&mut self, article_number: isize) -> Result<Vec<String>> {
 		self.retrieve_body(format!("BODY {}\r\n", article_number).as_slice())
 	}
 
@@ -186,7 +186,7 @@ impl NNTPStream {
 	}
 
 	/// Retrieves the headers of the article number in the currently selected newsgroup.
-	pub fn head_by_number(&mut self, article_number: int) -> Result<Vec<String>> {
+	pub fn head_by_number(&mut self, article_number: isize) -> Result<Vec<String>> {
 		self.retrieve_head(format!("HEAD {}\r\n", article_number).as_slice())
 	}
 
@@ -338,14 +338,14 @@ impl NNTPStream {
 
 		match self.read_response(223) {
 			Ok((_, message)) => Ok(message),
-			Err(e) => Err(e) 
+			Err(e) => Err(e)
 		}
 	}
 
 	/// Posts a message to the NNTP server.
 	pub fn post(&mut self, message: &str) -> Result<()> {
 		if !self.is_valid_message(message) {
-			return Err(Error::new(ErrorKind::Other, "Invalid message format. Message must end with \"\r\n.\r\n\"", None));
+			return Err(Error::new(ErrorKind::Other, "Invalid message format. Message must end with \"\r\n.\r\n\""));
 		}
 
 		let post_command = format!("POST\r\n");
@@ -382,14 +382,14 @@ impl NNTPStream {
 	}
 
 	/// Gets the information about the article number.
-	pub fn stat_by_number(&mut self, article_number: int) -> Result<String> {
+	pub fn stat_by_number(&mut self, article_number: isize) -> Result<String> {
 		self.retrieve_stat(format!("STAT {}\r\n", article_number).as_slice())
 	}
 
 	fn retrieve_stat(&mut self, stat_command: &str) -> Result<String> {
 		match self.stream.write_fmt(format_args!("{}", stat_command.as_slice())) {
 			Ok(_) => (),
-			Err(_) => return Err(Error::new(ErrorKind::Other, "Write Error", None))
+			Err(_) => return Err(Error::new(ErrorKind::Other, "Write Error"))
 		}
 
 		match self.read_response(223) {
@@ -409,12 +409,12 @@ impl NNTPStream {
 		let message_bytes = message_string.as_bytes();
 		let length = message_string.len();
 
-		return length >= 5 && (message_bytes[length-1] == lf && message_bytes[length-2] == cr && 
+		return length >= 5 && (message_bytes[length-1] == lf && message_bytes[length-2] == cr &&
 			message_bytes[length-3] == dot && message_bytes[length-4] == lf && message_bytes[length-5] == cr)
 	}
 
 	//Retrieve single line response
-	fn read_response(&mut self, expected_code: int) -> Result<(int, String)> {
+	fn read_response(&mut self, expected_code: isize) -> Result<(isize, String)> {
 		//Carriage return
 		let cr = 0x0d;
 		//Line Feed
@@ -425,7 +425,7 @@ impl NNTPStream {
 				let byte_buffer: &mut [u8] = &mut [0];
 				match self.stream.read(byte_buffer) {
 					Ok(_) => {},
-					Err(_) => return Err(Error::new(ErrorKind::Other, "Error reading response", None)),
+					Err(_) => return Err(Error::new(ErrorKind::Other, "Error reading response")),
 				}
 				line_buffer.push(byte_buffer[0]);
 		}
@@ -435,14 +435,14 @@ impl NNTPStream {
 		let trimmed_response = response.as_slice().trim_matches(chars_to_trim);
     	let trimmed_response_vec: Vec<char> = trimmed_response.chars().collect();
     	if trimmed_response_vec.len() < 5 || trimmed_response_vec[3] != ' ' {
-    		return Err(Error::new(ErrorKind::Other, "Invalid response", None));
+    		return Err(Error::new(ErrorKind::Other, "Invalid response"));
     	}
 
     	let v: Vec<&str> = trimmed_response.splitn(1, ' ').collect();
-    	let code: int = FromStr::from_str(v[0]).unwrap();
+    	let code: isize = FromStr::from_str(v[0]).unwrap();
     	let message = v[1];
     	if code != expected_code {
-    		return Err(Error::new(ErrorKind::Other, "Invalid response", None))
+    		return Err(Error::new(ErrorKind::Other, "Invalid response"))
     	}
     	Ok((code, String::from_str(message)))
 	}
@@ -471,12 +471,12 @@ impl NNTPStream {
         			if res == format!(".\r\n") {
         				complete = true;
         			}
-        			else { 
+        			else {
           				response.push(res.clone());
             			line_buffer = Vec::new();
             		}
         		},
-        		Err(_) => return Err(Error::new(ErrorKind::Other, "Error Reading", None))
+        		Err(_) => return Err(Error::new(ErrorKind::Other, "Error Reading"))
       		}
 		}
 		Ok(response)
