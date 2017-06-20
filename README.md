@@ -3,15 +3,8 @@ rust-nntp
 NNTP Client for Rust
 
 
-[![Build Status](https://travis-ci.org/mattnenterprise/rust-nntp.svg)](https://travis-ci.org/mattnenterprise/rust-nntp)
-
-### Installation
-
-Add nntp via your `Cargo.toml`:
-```toml
-[dependencies]
-nntp = "*"
-```
+[![Build Status](https://travis-ci.org/mattnenterprise/rust-imap.svg)](https://travis-ci.org/mattnenterprise/rust-imap)
+[![crates.io](http://meritbadge.herokuapp.com/nntp)](https://crates.io/crates/nntp)
 
 ### Usage
 ```rs
@@ -38,7 +31,7 @@ fn main() {
 		Ok(groups) => {
 			for group in groups.iter() {
 				println!("Name: {}, High: {}, Low: {}, Status: {}", group.name, group.high, group.low, group.status)
-			} 
+			}
 		},
 		Err(e) => panic!(e)
 	};
@@ -70,7 +63,7 @@ fn main() {
 			}
 		},
 		Err(e) => panic!(e)
-	}	
+	}
 
 	let _ = nntp_stream.quit();
 }
