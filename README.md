@@ -7,7 +7,7 @@ NNTP Client for Rust
 [![crates.io](http://meritbadge.herokuapp.com/nntp)](https://crates.io/crates/nntp)
 
 ### Usage
-```rs
+```rust
 extern crate nntp;
 
 use nntp::{Article, NNTPStream};
