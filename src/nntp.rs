@@ -6,6 +6,7 @@
 use std::string::String;
 use std::io::{Read, Result, Error, ErrorKind, Write};
 use std::net::TcpStream;
+use std::net::ToSocketAddrs;
 use std::vec::Vec;
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -13,8 +14,6 @@ use std::str::FromStr;
 /// Stream to be used for interfacing with a NNTP server.
 pub struct NNTPStream {
 	stream: TcpStream,
-	pub host: &'static str,
-	pub port: u16
 }
 
 pub struct Article {
@@ -67,9 +66,9 @@ impl NewsGroup {
 impl NNTPStream {
 
 	/// Creates an NNTP Stream.
-	pub fn connect(host: &'static str, port: u16) -> Result<NNTPStream> {
-		let tcp_stream = try!(TcpStream::connect((host, port)));
-		let mut socket = NNTPStream { stream: tcp_stream, host: host, port: port };
+	pub fn connect<A: ToSocketAddrs>(addr: A) -> Result<NNTPStream> {
+		let tcp_stream = TcpStream::connect(addr)?;
+		let mut socket = NNTPStream { stream: tcp_stream };
 
 		match socket.read_response(200) {
 			Ok(_) => (),
