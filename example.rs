@@ -2,58 +2,37 @@ extern crate nntp;
 
 use nntp::{Article, NNTPStream};
 
-fn main() {
-	let mut nntp_stream = match NNTPStream::connect(("nntp.aioe.org", 119)) {
-		Ok(stream) => stream,
-		Err(e) => panic!("{}", e)
-	};
+fn main() -> Result<(), std::io::Error> {
+    let mut nntp_stream = NNTPStream::connect(("nntp.aioe.org", 119))?;
 
-	match nntp_stream.capabilities() {
-		Ok(lines) => {
-			for line in lines.iter() {
-				print!("{}", line);
-			}
-		},
-		Err(e) => panic!(e)
+    let lines = nntp_stream.capabilities()?;
+    for line in lines.iter() {
+        print!("{}", line);
+    }
+
+	let groups = nntp_stream.list()?;
+	for group in groups.iter() {
+		println!("Name: {}, High: {}, Low: {}, Status: {}", group.name, group.high, group.low, group.status)
 	}
 
-	match nntp_stream.list() {
-		Ok(groups) => {
-			for group in groups.iter() {
-				println!("Name: {}, High: {}, Low: {}, Status: {}", group.name, group.high, group.low, group.status)
-			} 
-		},
-		Err(e) => panic!(e)
-	};
+    nntp_stream.group("comp.sys.raspberry-pi")?;
 
-	match nntp_stream.group("comp.sys.raspberry-pi") {
-		Ok(_) => (),
-		Err(e) => panic!(e)
-	}
+    let Article { headers, body } = nntp_stream.article_by_number(20058)?;
+    for (key, value) in headers.iter() {
+        println!("{}: {}", key, value)
+    }
+    for line in body.iter() {
+        print!("{}", line)
+    }
 
-	match nntp_stream.article_by_number(6187) {
-		Ok(Article{headers, body}) => {
-			for (key, value) in headers.iter() {
-				println!("{}: {}", key, value)
-			}
-			for line in body.iter() {
-				print!("{}", line)
-			}
-		},
-		Err(e) => panic!(e)
-	}
+    let Article { headers, body } =
+        nntp_stream.article_by_id("<a55pbedl7rf6sr0h1d9bf37q5qpj0rgn5j@4ax.com>")?;
+    for (key, value) in headers.iter() {
+        println!("{}: {}", key, value)
+    }
+    for line in body.iter() {
+        print!("{}", line)
+    }
 
-	match nntp_stream.article_by_id("<cakj55F1dofU5@mid.individual.net>") {
-		Ok(Article{headers, body}) => {
-			for (key, value) in headers.iter() {
-				println!("{}: {}", key, value)
-			}
-			for line in body.iter() {
-				print!("{}", line)
-			}
-		},
-		Err(e) => panic!(e)
-	}	
-
-	let _ = nntp_stream.quit();
+    nntp_stream.quit()
 }
