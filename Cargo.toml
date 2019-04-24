@@ -8,6 +8,9 @@ description = "NNTP client for Rust"
 readme = "README.md"
 license = "MIT OR Apache-2.0"
 
+[dependencies]
+bufstream = "0.1"
+
 [lib]
 name = "nntp"
 path = "src/nntp.rs"

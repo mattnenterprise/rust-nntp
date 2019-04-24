@@ -17,12 +17,12 @@ fn main() -> Result<(), std::io::Error> {
 
     nntp_stream.group("comp.sys.raspberry-pi")?;
 
-    let Article { headers, body } = nntp_stream.article_by_number(20058)?;
+    let Article { headers, body } = nntp_stream.article_by_number(20000)?;
     for (key, value) in headers.iter() {
         println!("{}: {}", key, value)
     }
     for line in body.iter() {
-        print!("{}", line)
+        println!("{}", line)
     }
 
     let Article { headers, body } =
@@ -31,8 +31,9 @@ fn main() -> Result<(), std::io::Error> {
         println!("{}: {}", key, value)
     }
     for line in body.iter() {
-        print!("{}", line)
+        println!("{}", line)
     }
 
+    println!("COMMAND: quit");
     nntp_stream.quit()
 }

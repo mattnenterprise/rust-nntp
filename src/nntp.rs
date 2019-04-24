@@ -1,3 +1,6 @@
+extern crate bufstream;
+use bufstream::BufStream;
+
 use std::collections::HashMap;
 use std::io::{Error, ErrorKind, Read, Result, Write};
 use std::net::TcpStream;
@@ -5,6 +8,7 @@ use std::net::ToSocketAddrs;
 use std::str::FromStr;
 use std::string::String;
 use std::vec::Vec;
+
 
 /// Commands
 const LIST: &'static [u8; 6] = b"LIST\r\n";
@@ -16,15 +20,13 @@ const HEAD: &'static [u8; 6] = b"HEAD\r\n";
 const LAST: &'static [u8; 6] = b"LAST\r\n";
 const QUIT: &'static [u8; 6] = b"QUIT\r\n";
 const HELP: &'static [u8; 6] = b"HELP\r\n";
-const CRNL: &'static [u8; 2] = b"\r\n";
 const NEXT: &'static [u8; 6] = b"NEXT\r\n";
 const POST: &'static [u8; 6] = b"POST\r\n";
 const STAT: &'static [u8; 6] = b"STAT\r\n";
-const MULTILINE_END: &'static [u8; 3] = b".\r\n";
 
 /// Stream to be used for interfacing with a NNTP server.
 pub struct NNTPStream {
-    stream: TcpStream,
+    stream: BufStream<TcpStream>,
 }
 
 pub struct Article {
@@ -32,23 +34,20 @@ pub struct Article {
     pub body: Vec<String>,
 }
 
-impl Article {
+impl Article<> {
     pub fn new_article(lines: Vec<String>) -> Article {
         let mut headers = HashMap::new();
         let mut body = Vec::new();
         let mut parsing_headers = true;
 
         for i in lines.iter() {
-            if i.as_bytes() == CRNL {
+            if i.len() == 0 {
                 parsing_headers = false;
                 continue;
             }
             if parsing_headers {
-                let mut header = i.splitn(2, ':');
-                let chars_to_trim: &[char] = &['\r', '\n'];
-                let key = format!("{}", header.nth(0).unwrap().trim_matches(chars_to_trim));
-                let value = format!("{}", header.nth(0).unwrap().trim_matches(chars_to_trim));
-                headers.insert(key, value);
+                let mut header : Vec<&str> = i.splitn(2, ':').collect();
+                headers.insert(header[0].to_owned(), header[1].to_owned());
             } else {
                 body.push(i.clone());
             }
@@ -85,7 +84,7 @@ impl NNTPStream {
     /// Creates an NNTP Stream.
     pub fn connect<A: ToSocketAddrs>(addr: A) -> Result<NNTPStream> {
         let tcp_stream = TcpStream::connect(addr)?;
-        let mut socket = NNTPStream { stream: tcp_stream };
+        let mut socket = NNTPStream { stream: BufStream::new(tcp_stream) };
 
         socket
             .read_response(200)
@@ -110,14 +109,14 @@ impl NNTPStream {
     }
 
     fn retrieve_article(&mut self, article_command: &[u8]) -> Result<Article> {
-        self.stream
-            .write_all(article_command)
+        self.write_all(article_command)
             .map(|_| Error::new(ErrorKind::Other, "Failed to retrieve article"))?;
 
-        let (_code, _first_line) = self.read_response(220)?;
+        let (_code, _first_line) = self.read_response(220).unwrap();
 
-        self.read_multiline_response()
-            .map(|ls| Article::new_article(ls))
+        let res = self.read_buffered_multiline_response()
+            .map(|ls| Article::new_article(ls));
+        res
     }
 
     /// Retrieves the body of the current article number in the currently selected newsgroup.
@@ -136,25 +135,25 @@ impl NNTPStream {
     }
 
     fn retrieve_body(&mut self, body_command: &[u8]) -> Result<Vec<String>> {
-        self.stream.write_all(body_command)?;
+        self.write_all(body_command)?;
 
         let (_code, _first_line) = self.read_response(222)?;
 
-        self.read_multiline_response()
+        self.read_buffered_multiline_response()
     }
 
     /// Gives the list of capabilities that the server has.
     pub fn capabilities(&mut self) -> Result<Vec<String>> {
-        self.stream.write_all(CAPABILITIES)?;
+        self.write_all(CAPABILITIES)?;
 
         let (_code, _first_line) = self.read_response(101)?;
 
-        self.read_multiline_response()
+        self.read_buffered_multiline_response()
     }
 
     /// Retrieves the date as the server sees the date.
     pub fn date(&mut self) -> Result<String> {
-        self.stream.write_all(DATE)?;
+        self.write_all(DATE)?;
 
         self.read_response(111).map(|(_, body)| body)
     }
@@ -175,27 +174,27 @@ impl NNTPStream {
     }
 
     fn retrieve_head(&mut self, head_command: &[u8]) -> Result<Vec<String>> {
-        self.stream.write_all(head_command)?;
+        self.write_all(head_command)?;
 
         let (_code, _first_line) = self.read_response(221)?;
 
-        self.read_multiline_response()
+        self.read_buffered_multiline_response()
     }
 
     /// Moves the currently selected article number back one
     pub fn last(&mut self) -> Result<String> {
-        self.stream.write_all(LAST)?;
+        self.write_all(LAST)?;
 
         self.read_response(223).map(|(_, message)| message)
     }
 
     /// Lists all of the newgroups on the server.
     pub fn list(&mut self) -> Result<Vec<NewsGroup>> {
-        self.stream.write_all(LIST)?;
+        self.write_all(LIST)?;
 
         let (_code, _first_line) = self.read_response(215)?;
 
-        match self.read_multiline_response() {
+        match self.read_buffered_multiline_response() {
             Ok(lines) => {
                 let lines: Vec<NewsGroup> = lines
                     .iter()
@@ -209,32 +208,25 @@ impl NNTPStream {
 
     /// Selects a newsgroup
     pub fn group(&mut self, group: &str) -> Result<()> {
-        self.stream
-            .write_all(format!("GROUP {}\r\n", group).as_bytes())?;
+        self.write_all(format!("GROUP {}\r\n", group).as_bytes())?;
 
         self.read_response(211).map(|_| ())
     }
 
     /// Show the help command given on the server.
     pub fn help(&mut self) -> Result<Vec<String>> {
-        self.stream.write_all(HELP)?;
+        self.write_all(HELP)?;
 
         let (_code, _first_line) = self.read_response(100)?;
 
-        self.read_multiline_response()
+        self.read_buffered_multiline_response()
     }
 
     /// Quits the current session.
     pub fn quit(&mut self) -> Result<()> {
-        match self.stream.write_all(QUIT) {
-            Ok(_) => (),
-            Err(e) => return Err(e),
-        }
+        self.write_all(QUIT)?;
 
-        match self.read_response(205) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(e),
-        }
+        self.read_response(205).map(|_| ())
     }
 
     /// Retrieves a list of newsgroups since the date and time given.
@@ -255,7 +247,7 @@ impl NNTPStream {
             Err(e) => return Err(e),
         }
 
-        self.read_multiline_response()
+        self.read_buffered_multiline_response()
     }
 
     /// Retrieves a list of new news since the date and time given.
@@ -271,16 +263,16 @@ impl NNTPStream {
             false => format!("NEWNEWS {} {} {}\r\n", wildmat, date, time),
         };
 
-        self.stream.write_all(newnews_command.as_bytes())?;
+        self.write_all(newnews_command.as_bytes())?;
 
         self.read_response(230)?;
 
-        self.read_multiline_response()
+        self.read_buffered_multiline_response()
     }
 
     /// Moves the currently selected article number forward one
     pub fn next(&mut self) -> Result<String> {
-        self.stream.write_all(NEXT)?;
+        self.write_all(NEXT)?;
 
         self.read_response(223).map(|(_, message)| message)
     }
@@ -294,11 +286,11 @@ impl NNTPStream {
             ));
         }
 
-        self.stream.write_all(POST)?;
+        self.write_all(POST)?;
 
         self.read_response(340)?;
 
-        self.stream.write_all(message.as_bytes())?;
+        self.write_all(message.as_bytes())?;
 
         self.read_response(240).map(|_| ())
     }
@@ -316,6 +308,11 @@ impl NNTPStream {
     /// Gets the information about the article number.
     pub fn stat_by_number(&mut self, article_number: isize) -> Result<String> {
         self.retrieve_stat(format!("STAT {}\r\n", article_number).as_bytes())
+    }
+
+    fn write_all(&mut self, buf: &[u8]) -> Result<()> {
+        self.stream.write_all(buf)?;
+        self.stream.flush()
     }
 
     fn retrieve_stat(&mut self, stat_command: &[u8]) -> Result<String> {
@@ -368,8 +365,7 @@ impl NNTPStream {
         let response = String::from_utf8(line_buffer).unwrap();
         let chars_to_trim: &[char] = &['\r', '\n'];
         let trimmed_response = response.trim_matches(chars_to_trim);
-        let trimmed_response_vec: Vec<char> = trimmed_response.chars().collect();
-        if trimmed_response_vec.len() < 5 || trimmed_response_vec[3] != ' ' {
+        if trimmed_response.len() < 5 || &trimmed_response[3..4] != " " {
             return Err(Error::new(ErrorKind::Other, "Invalid response"));
         }
 
@@ -379,43 +375,55 @@ impl NNTPStream {
         if code != expected_code {
             return Err(Error::new(ErrorKind::Other, "Invalid response"));
         }
+
         Ok((code, message.to_string()))
     }
 
-    fn read_multiline_response(&mut self) -> Result<Vec<String>> {
-        let mut response: Vec<String> = Vec::new();
-        //Carriage return
-        let cr = 0x0d;
-        //Line Feed
-        let lf = 0x0a;
-        let mut line_buffer: Vec<u8> = Vec::new();
-        let mut complete = false;
+    fn read_buffered_multiline_response(&mut self) -> Result<Vec<String>> {
+        let mut output = Vec::new();
 
-        while !complete {
-            while line_buffer.len() < 2
-                || (line_buffer[line_buffer.len() - 1] != lf
-                    && line_buffer[line_buffer.len() - 2] != cr)
-            {
-                let byte_buffer: &mut [u8] = &mut [0];
-                match self.stream.read(byte_buffer) {
-                    Ok(_) => {}
-                    Err(_) => println!("Error Reading!"),
-                }
-                line_buffer.push(byte_buffer[0]);
-            }
+        let mut buf = &mut self.stream;
+        let lines_iter = NNTPLines { buf: &mut buf };
 
-            match String::from_utf8(line_buffer.clone()) {
-                Ok(res) => {
-                    if res.as_bytes() == MULTILINE_END {
-                        complete = true;
-                    } else {
-                        response.push(res);
-                        line_buffer = Vec::new();
-                    }
-                }
-                Err(_) => return Err(Error::new(ErrorKind::Other, "Error Reading")),
+        for line in lines_iter {
+            match line {
+                Ok(l) => {
+                    output.push(unsafe { String::from_utf8_unchecked(l) })
+                },
+                Err(_) => {
+                    return Err(Error::new(ErrorKind::Other, "problem reading lines"))
+                },
             }
         }
-        Ok(response)
+
+        Ok(output)
+    }
+}
+
+struct NNTPLines<'a> {
+    buf: &'a mut bufstream::BufStream<std::net::TcpStream>,
+}
+
+/// A reimplementation of the BufReader::lines method with
+/// some added logic for handling NNTP empty line signals
+impl<'a> Iterator for NNTPLines<'a> {
+    type Item = Result<Vec<u8>>;
+
+    fn next(&mut self) -> Option<Result<Vec<u8>>> {
+        use std::io::BufRead;
+        let next = self.buf.lines().next();
+        match next {
+            Some(Ok(l)) => {
+                if &l[..] == "." {
+                    None
+                } else {
+                    Some(Ok(l.as_bytes().to_owned()))
+                }
+            },
+            Some(Err(_)) => {
+                Some(Err(Error::new(ErrorKind::Other, "problem reading line")))
+            },
+            None => None
+        }
     }
 }
