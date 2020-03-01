@@ -64,10 +64,9 @@ pub async fn main() -> Result<(), NNTPError> {
 
     let mut before_bytes: usize = client.stream.bytes_read();
 
-    for chunk in chunks {
-        let mut iter = chunk.into_iter();
-        let first = iter.next().unwrap();
-        let last = iter.last().unwrap();
+    for mut chunk in chunks {
+        let first = chunk.next().unwrap();
+        let last = chunk.last().unwrap();
         info!("{:?}-{:?}", first, last);
 
         let inst = std::time::Instant::now();
@@ -112,7 +111,7 @@ pub async fn main() -> Result<(), NNTPError> {
             };
 
             let doc_id = format!("{}-{}", group_name, id);
-            docs.push(json!({"index": {"_id": doc_id}}).into());
+            docs.push(json!({"index": {"_id": doc_id}}));
             docs.push(doc);
         }
 
@@ -126,7 +125,7 @@ pub async fn main() -> Result<(), NNTPError> {
         let inst = std::time::Instant::now();
         let res = elastic_client
             .bulk(BulkParts::Index("index-00001"))
-            .body(docs.into_iter().map(|x| JsonBody::new(x)).collect())
+            .body(docs.into_iter().map(JsonBody::new).collect())
             .send()
             .await;
         if res.is_err() {
