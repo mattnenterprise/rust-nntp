@@ -6,11 +6,11 @@ extern crate log;
 extern crate serde_json;
 extern crate tokio;
 
-use nntp::capabilities::{Capability, Compression};
+use nntp_client::capabilities::{Capability, Compression};
 
 use elasticsearch::http::request::JsonBody;
 use elasticsearch::BulkParts;
-use nntp::prelude::*;
+use nntp_client::prelude::*;
 use pretty_bytes::converter::convert;
 use serde_json::Value;
 use std::time::Instant;
