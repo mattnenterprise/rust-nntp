@@ -12,12 +12,12 @@ edition = "2018"
 
 [dependencies]
 bufstream = "0"
-prettytable-rs = "0"
+bytes = "0"
+flate2 = "1"
+log = "0"
 native-tls = "0"
 pretty-bytes = "0"
-log = "0"
-yenc = "0"
-flate2 = "1"
+prettytable-rs = "0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-bytes = "0"
+yenc = "0"
