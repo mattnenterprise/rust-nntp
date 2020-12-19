@@ -1,8 +1,6 @@
 #![crate_name = "nntp"]
 #![crate_type = "lib"]
 
-//#![feature(collections)]
-
 use std::string::String;
 use std::io::{Read, Result, Error, ErrorKind, Write};
 use std::net::TcpStream;
@@ -28,22 +26,22 @@ impl Article {
 		let mut parsing_headers = true;
 
 		for i in lines.iter() {
-			if i == &format!("\r\n") {
+			if i == &"\r\n".to_string() {
 				parsing_headers = false;
 				continue;
 			}
 			if parsing_headers {
 				let mut header = i.splitn(2, ':');
 				let chars_to_trim: &[char] = &['\r', '\n'];
-				let key = format!("{}", header.nth(0).unwrap().trim_matches(chars_to_trim));
-				let value = format!("{}", header.nth(0).unwrap().trim_matches(chars_to_trim));
+				let key = header.next().unwrap().trim_matches(chars_to_trim).to_string();
+				let value = header.next().unwrap().trim_matches(chars_to_trim).to_string();
 				headers.insert(key, value);
 			} else {
 				body.push(i.clone());
 			}
 
 		}
-		Article {headers: headers, body: body}
+		Article {headers, body}
 	}
 }
 
@@ -59,7 +57,7 @@ impl NewsGroup {
 		let chars_to_trim: &[char] = &['\r', '\n', ' '];
 		let trimmed_group = group.trim_matches(chars_to_trim);
 		let split_group: Vec<&str> = trimmed_group.split(' ').collect();
-		NewsGroup{name: format!("{}", split_group[0]), high: FromStr::from_str(split_group[1]).unwrap(), low: FromStr::from_str(split_group[2]).unwrap(), status: format!("{}", split_group[3])}
+		NewsGroup{name: split_group[0].to_string(), high: FromStr::from_str(split_group[1]).unwrap(), low: FromStr::from_str(split_group[2]).unwrap(), status: split_group[3].to_string()}
 	}
 }
 
@@ -80,7 +78,7 @@ impl NNTPStream {
 
 	/// The article indicated by the current article number in the currently selected newsgroup is selected.
 	pub fn article(&mut self) -> Result<Article> {
-		self.retrieve_article(&format!("ARTICLE\r\n"))
+		self.retrieve_article(&"ARTICLE\r\n".to_string())
 	}
 
 	/// The article indicated by the article id is selected.
@@ -114,7 +112,7 @@ impl NNTPStream {
 
 	/// Retrieves the body of the current article number in the currently selected newsgroup.
 	pub fn body(&mut self) -> Result<Vec<String>> {
-		self.retrieve_body(&format!("BODY\r\n"))
+		self.retrieve_body(&"BODY\r\n".to_string())
 	}
 
 	/// Retrieves the body of the article id.
@@ -143,7 +141,7 @@ impl NNTPStream {
 
 	/// Gives the list of capabilities that the server has.
 	pub fn capabilities(&mut self) -> Result<Vec<String>> {
-		let capabilities_command = format!("CAPABILITIES\r\n");
+		let capabilities_command = "CAPABILITIES\r\n".to_string();
 
 		match self.stream.write_fmt(format_args!("{}", capabilities_command)) {
 			Ok(_) => (),
@@ -160,7 +158,7 @@ impl NNTPStream {
 
 	/// Retrieves the date as the server sees the date.
 	pub fn date(&mut self) -> Result<String> {
-		let date_command = format!("DATE\r\n");
+		let date_command = "DATE\r\n".to_string();
 
 		match self.stream.write_fmt(format_args!("{}", date_command)) {
 			Ok(_) => (),
@@ -175,7 +173,7 @@ impl NNTPStream {
 
 	/// Retrieves the headers of the current article number in the currently selected newsgroup.
 	pub fn head(&mut self) -> Result<Vec<String>> {
-		self.retrieve_head(&format!("HEAD\r\n"))
+		self.retrieve_head(&"HEAD\r\n".to_string())
 	}
 
 	/// Retrieves the headers of the article id.
@@ -204,7 +202,7 @@ impl NNTPStream {
 
 	/// Moves the currently selected article number back one
 	pub fn last(&mut self) -> Result<String> {
-		let last_command = format!("LAST\r\n");
+		let last_command = "LAST\r\n".to_string();
 
 		match self.stream.write_fmt(format_args!("{}", last_command)) {
 			Ok(_) => (),
@@ -219,7 +217,7 @@ impl NNTPStream {
 
 	/// Lists all of the newgroups on the server.
 	pub fn list(&mut self) -> Result<Vec<NewsGroup>> {
-		let list_command = format!("LIST\r\n");
+		let list_command = "LIST\r\n".to_string();
 
 		match self.stream.write_fmt(format_args!("{}", list_command)) {
 			Ok(_) => (),
@@ -233,8 +231,8 @@ impl NNTPStream {
 
 		match self.read_multiline_response() {
 			Ok(lines) => {
-				let lines: Vec<NewsGroup> = lines.iter().map(|ref mut x| NewsGroup::new_news_group((*x))).collect();
-				return Ok(lines)
+				let lines: Vec<NewsGroup> = lines.iter().map(|ref mut x| NewsGroup::new_news_group(*x)).collect();
+				Ok(lines)
 			},
 			Err(e) => Err(e)
 		}
@@ -257,7 +255,7 @@ impl NNTPStream {
 
 	/// Show the help command given on the server.
 	pub fn help(&mut self) -> Result<Vec<String>> {
-		let help_command = format!("HELP\r\n");
+		let help_command = "HELP\r\n".to_string();
 
 		match self.stream.write_fmt(format_args!("{}", help_command)) {
 			Ok(_) => (),
@@ -274,7 +272,7 @@ impl NNTPStream {
 
 	/// Quits the current session.
 	pub fn quit(&mut self) -> Result<()> {
-		let quit_command = format!("QUIT\r\n");
+		let quit_command = "QUIT\r\n".to_string();
 		match self.stream.write_fmt(format_args!("{}", quit_command)) {
 			Ok(_) => (),
 			Err(e) => return Err(e)
@@ -328,7 +326,7 @@ impl NNTPStream {
 
 	/// Moves the currently selected article number forward one
 	pub fn next(&mut self) -> Result<String> {
-		let next_command = format!("NEXT\r\n");
+		let next_command = "NEXT\r\n".to_string();
 		match self.stream.write_fmt(format_args!("{}", next_command)) {
 			Ok(_) => (),
 			Err(e) => return Err(e)
@@ -346,7 +344,7 @@ impl NNTPStream {
 			return Err(Error::new(ErrorKind::Other, "Invalid message format. Message must end with \"\r\n.\r\n\""));
 		}
 
-		let post_command = format!("POST\r\n");
+		let post_command = "POST\r\n".to_string();
 
 		match self.stream.write_fmt(format_args!("{}", post_command)) {
 			Ok(_) => (),
@@ -371,7 +369,7 @@ impl NNTPStream {
 
 	/// Gets information about the current article.
 	pub fn stat(&mut self) -> Result<String> {
-		self.retrieve_stat(&format!("STAT\r\n"))
+		self.retrieve_stat(&"STAT\r\n".to_string())
 	}
 
 	/// Gets the information about the article id.
@@ -407,7 +405,7 @@ impl NNTPStream {
 		let message_bytes = message_string.as_bytes();
 		let length = message_string.len();
 
-		return length >= 5 && (message_bytes[length-1] == lf && message_bytes[length-2] == cr &&
+		length >= 5 && (message_bytes[length-1] == lf && message_bytes[length-2] == cr &&
 			message_bytes[length-3] == dot && message_bytes[length-4] == lf && message_bytes[length-5] == cr)
 	}
 
@@ -466,7 +464,7 @@ impl NNTPStream {
 
 			match String::from_utf8(line_buffer.clone()) {
         		Ok(res) => {
-        			if res == format!(".\r\n") {
+        			if res == *".\r\n".to_string() {
         				complete = true;
         			}
         			else {
